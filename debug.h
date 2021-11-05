@@ -13,7 +13,9 @@
 
 #include <glib.h>
 #include <glib/gprintf.h>
+#include <inttypes.h>
 #include "log.h"
+#include "utils.h"
 
 extern int janus_log_level;
 extern gboolean janus_log_timestamps;
@@ -90,16 +92,20 @@ do { \
 	if (level > LOG_NONE && level <= LOG_MAX && level <= janus_log_level) { \
 		char janus_log_ts[64] = ""; \
 		char janus_log_src[128] = ""; \
-		if (janus_log_timestamps) { \
+/*		if (janus_log_timestamps) { \
 			struct tm janustmresult; \
 			time_t janusltime = time(NULL); \
 			localtime_r(&janusltime, &janustmresult); \
 			strftime(janus_log_ts, sizeof(janus_log_ts), \
 			         "[%a %b %e %T %Y] ", &janustmresult); \
 		} \
-		if (level == LOG_FATAL || level == LOG_ERR || level == LOG_DBG) { \
+*/ \
+		if (janus_log_timestamps) {              \
+			snprintf(janus_log_ts, sizeof(janus_log_ts), "[ms %" PRIu64 "]", janus_get_real_time()/G_GINT64_CONSTANT(1000)); \
+		}\
+		if (level == LOG_FATAL || level == LOG_ERR || level == LOG_DBG || level || !level) { \
 			snprintf(janus_log_src, sizeof(janus_log_src), \
-			         "[%s:%s:%d] ", __FILE__, __FUNCTION__, __LINE__); \
+			         "[src %s:%s:%d] [pid %lu] ", __FILE__, __FUNCTION__, __LINE__, (long unsigned)pthread_self()); \
 		} \
 		JANUS_PRINT("%s%s%s%s" format, \
 			janus_log_global_prefix ? janus_log_global_prefix : "", \

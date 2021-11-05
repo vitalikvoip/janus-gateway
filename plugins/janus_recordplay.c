@@ -274,6 +274,7 @@
 #include "../config.h"
 #include "../mutex.h"
 #include "../record.h"
+#include "../live.h"
 #include "../sdp-utils.h"
 #include "../rtp.h"
 #include "../rtcp.h"
@@ -439,6 +440,7 @@ typedef struct janus_recordplay_session {
 	janus_recorder *arc;	/* Audio recorder */
 	janus_recorder *vrc;	/* Video recorder */
 	janus_recorder *drc;	/* Data recorder */
+	janus_live_pub *pub;    /* live pub */
 	janus_mutex rec_mutex;	/* Mutex to protect the recorders from race conditions */
 	janus_recordplay_frame_packet *aframes;	/* Audio frames (for playout) */
 	janus_recordplay_frame_packet *vframes;	/* Video frames (for playout) */
@@ -499,6 +501,7 @@ static void janus_recordplay_recording_free(const janus_refcount *recording_ref)
 
 
 static char *recordings_path = NULL;
+static char *rtmp_path = NULL;
 void janus_recordplay_update_recordings_list(void);
 static void *janus_recordplay_playout_thread(void *data);
 
@@ -795,6 +798,9 @@ int janus_recordplay_init(janus_callbacks *callback, const char *config_path) {
 		janus_config_item *path = janus_config_get(config, config_general, janus_config_type_item, "path");
 		if(path && path->value)
 			recordings_path = g_strdup(path->value);
+		janus_config_item *rtmp = janus_config_get(config, config_general, janus_config_type_item, "rtmp");
+		if(rtmp && rtmp->value)
+			rtmp_path = g_strdup(rtmp->value);
 		janus_config_item *events = janus_config_get(config, config_general, janus_config_type_item, "events");
 		if(events != NULL && events->value != NULL)
 			notify_events = janus_is_true(events->value);
@@ -925,6 +931,7 @@ void janus_recordplay_create_session(janus_plugin_session *handle, int *error) {
 	session->video_bitrate = 1024 * 1024; 		/* This is 1mbps by default */
 	session->video_keyframe_request_last = 0;
 	session->video_keyframe_interval = 15000; 	/* 15 seconds by default */
+	session->video_keyframe_interval = 1000;
 	session->video_fir_seq = 0;
 	janus_rtp_switching_context_reset(&session->context);
 	janus_rtp_simulcasting_context_reset(&session->sim_context);
@@ -1258,6 +1265,7 @@ void janus_recordplay_send_rtcp_feedback(janus_plugin_session *handle, int video
 
 	if(elapsed >= interval) {
 		/* Send a PLI */
+		JANUS_LOG(LOG_INFO, "send pli and fir\n");
 		gateway->send_pli(handle);
 		session->video_keyframe_request_last = now;
 	}
@@ -1266,35 +1274,47 @@ void janus_recordplay_send_rtcp_feedback(janus_plugin_session *handle, int video
 void janus_recordplay_incoming_rtp(janus_plugin_session *handle, janus_plugin_rtp *packet) {
 	if(handle == NULL || g_atomic_int_get(&handle->stopped) || g_atomic_int_get(&stopping) || !g_atomic_int_get(&initialized))
 		return;
+
 	janus_recordplay_session *session = (janus_recordplay_session *)handle->plugin_handle;
+
 	if(!session) {
 		JANUS_LOG(LOG_ERR, "No session associated with this handle...\n");
 		return;
 	}
+
 	if(g_atomic_int_get(&session->destroyed))
 		return;
+
 	if(!session->recorder || !session->recording)
 		return;
-	gboolean video = packet->video;
-	char *buf = packet->buffer;
-	uint16_t len = packet->length;
+
+	JANUS_LOG(LOG_INFO, "got { %s } packet\n", (packet->video)?"video":"audio");
+
+	gboolean  video = packet->video;
+	char     *buf   = packet->buffer;
+	uint16_t  len   = packet->length;
+
 	if(video && (session->ssrc[0] != 0 || session->rid[0] != NULL)) {
 		/* Handle simulcast: backup the header information first */
-		janus_rtp_header *header = (janus_rtp_header *)buf;
-		uint32_t seq_number = ntohs(header->seq_number);
-		uint32_t timestamp = ntohl(header->timestamp);
-		uint32_t ssrc = ntohl(header->ssrc);
+		janus_rtp_header *header     = (janus_rtp_header *)buf;
+		uint32_t          seq_number = ntohs(header->seq_number);
+		uint32_t          timestamp  = ntohl(header->timestamp);
+		uint32_t          ssrc       = ntohl(header->ssrc);
+
 		/* Process this packet: don't save if it's not the SSRC/layer we wanted to handle */
 		gboolean save = janus_rtp_simulcasting_context_process_rtp(&session->sim_context,
 			buf, len, session->ssrc, session->rid, session->recording->vcodec, &session->context);
+
 		if(session->sim_context.need_pli) {
 			/* Send a PLI */
 			JANUS_LOG(LOG_VERB, "We need a PLI for the simulcast context\n");
 			gateway->send_pli(handle);
 		}
+
 		/* Do we need to drop this? */
 		if(!save)
 			return;
+
 		/* If we got here, update the RTP header and save the packet */
 		janus_rtp_header_update(header, &session->context, TRUE, 0);
 		if(session->recording->vcodec == JANUS_VIDEOCODEC_VP8) {
@@ -1302,18 +1322,23 @@ void janus_recordplay_incoming_rtp(janus_plugin_session *handle, janus_plugin_rt
 			char *payload = janus_rtp_payload(buf, len, &plen);
 			janus_vp8_simulcast_descriptor_update(payload, plen, &session->vp8_context, session->sim_context.changed_substream);
 		}
+
 		/* Save the frame if we're recording (and make sure the SSRC never changes even if the substream does) */
 		if(session->rec_vssrc == 0)
 			session->rec_vssrc = g_random_int();
+
 		header->ssrc = htonl(session->rec_vssrc);
 		janus_recorder_save_frame(session->vrc, buf, len);
+		janus_live_pub_save_frame(session->pub, buf, len, TRUE, 1);
+
 		/* Restore header or core statistics will be messed up */
-		header->ssrc = htonl(ssrc);
-		header->timestamp = htonl(timestamp);
+		header->ssrc       = htonl(ssrc);
+		header->timestamp  = htonl(timestamp);
 		header->seq_number = htons(seq_number);
 	} else {
 		/* Save the frame if we're recording */
 		janus_recorder_save_frame(video ? session->vrc : session->arc, buf, len);
+		janus_live_pub_save_frame(session->pub, buf, len, video, 1);
 	}
 
 	janus_recordplay_send_rtcp_feedback(handle, video, buf, len);
@@ -1424,6 +1449,13 @@ static void janus_recordplay_hangup_media_internal(janus_plugin_session *handle)
 		janus_recorder_close(rc);
 		JANUS_LOG(LOG_INFO, "Closed data recording %s\n", rc->filename ? rc->filename : "??");
 		janus_recorder_destroy(rc);
+	}
+	if(session->pub) {
+		janus_live_pub *pub = session->pub;
+		session->pub = NULL;
+		janus_live_pub_close(pub);
+		JANUS_LOG(LOG_INFO, "Closed rtmp living %s\n", pub->url ? pub->url : "??");
+		janus_live_pub_destroy(pub);
 	}
 	janus_mutex_unlock(&session->rec_mutex);
 	if(session->recorder) {
@@ -1645,6 +1677,7 @@ static void *janus_recordplay_handler(void *data) {
 			/* Check which codec we should record for audio and/or video */
 			const char *acodec = NULL, *vcodec = NULL;
 			janus_sdp_find_preferred_codecs(offer, &acodec, &vcodec);
+			vcodec = "h264";
 			if(audiocodec != NULL)
 				acodec = json_string_value(audiocodec);
 			rec->acodec = janus_audiocodec_from_name(acodec);
@@ -1783,6 +1816,12 @@ static void *janus_recordplay_handler(void *data) {
 					textdata ? "text" : "binary", NULL, rec->drc_file);
 				session->drc = rc;
 			}
+
+			char rtmpurl[1024];
+			rtmpurl[0] = '\0';
+			g_snprintf(rtmpurl, 1024, "%s/%"SCNu64"", rtmp_path, rec->id);
+			session->pub = janus_live_pub_create(rtmp_path, janus_audiocodec_name(rec->acodec), janus_videocodec_name(rec->vcodec));
+
 			session->recorder = TRUE;
 			session->recording = rec;
 			session->sdp_version = 1;	/* This needs to be increased when it changes */

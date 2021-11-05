@@ -629,7 +629,7 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 	if(video) {
 		if(ssrc != context->v_last_ssrc) {
 			/* Video SSRC changed: update both sequence number and timestamp */
-			JANUS_LOG(LOG_VERB, "Video SSRC changed, %"SCNu32" --> %"SCNu32"\n",
+			JANUS_LOG(LOG_VERB, "XXX Video SSRC changed, %"SCNu32" --> %"SCNu32"\n",
 				context->v_last_ssrc, ssrc);
 			context->v_last_ssrc = ssrc;
 			context->v_ts_reset = TRUE;
@@ -639,7 +639,7 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 		}
 		if(context->v_ts_reset) {
 			/* Video timestamp was paused for a while */
-			JANUS_LOG(LOG_HUGE, "Video RTP timestamp reset requested");
+			JANUS_LOG(LOG_HUGE, "XXX Video RTP timestamp reset requested");
 			context->v_ts_reset = FALSE;
 			context->v_base_ts_prev = context->v_last_ts;
 			context->v_base_ts = timestamp;
@@ -651,12 +651,12 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 					time_diff = 1;
 				context->v_base_ts_prev += (guint32)time_diff;
 				context->v_last_ts += (guint32)time_diff;
-				JANUS_LOG(LOG_HUGE, "Computed offset for video RTP timestamp: %"SCNu32"\n", (guint32)time_diff);
+				JANUS_LOG(LOG_HUGE, "XXX Computed offset for video RTP timestamp: %"SCNu32"\n", (guint32)time_diff);
 			}
 		}
 		if(context->v_seq_reset) {
 			/* Video sequence number was paused for a while */
-			JANUS_LOG(LOG_HUGE, "Video RTP sequence number reset requested");
+			JANUS_LOG(LOG_HUGE, "XXX Video RTP sequence number reset requested\n");
 			context->v_seq_reset = FALSE;
 			context->v_base_seq_prev = context->v_last_seq;
 			context->v_base_seq = seq;
@@ -674,7 +674,7 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 	} else {
 		if(ssrc != context->a_last_ssrc) {
 			/* Audio SSRC changed: update both sequence number and timestamp */
-			JANUS_LOG(LOG_VERB, "Audio SSRC changed, %"SCNu32" --> %"SCNu32"\n",
+			JANUS_LOG(LOG_VERB, "XXX Audio SSRC changed, %"SCNu32" --> %"SCNu32"\n",
 				context->a_last_ssrc, ssrc);
 			context->a_last_ssrc = ssrc;
 			context->a_ts_reset = TRUE;
@@ -684,7 +684,7 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 		}
 		if(context->a_ts_reset) {
 			/* Audio timestamp was paused for a while */
-			JANUS_LOG(LOG_HUGE, "Audio RTP timestamp reset requested");
+			JANUS_LOG(LOG_HUGE, "XXX Audio RTP timestamp reset requested\n");
 			context->a_ts_reset = FALSE;
 			context->a_base_ts_prev = context->a_last_ts;
 			context->a_base_ts = timestamp;
@@ -700,12 +700,12 @@ void janus_rtp_header_update(janus_rtp_header *header, janus_rtp_switching_conte
 				context->a_base_ts_prev += (guint32)time_diff;
 				context->a_prev_ts += (guint32)time_diff;
 				context->a_last_ts += (guint32)time_diff;
-				JANUS_LOG(LOG_HUGE, "Computed offset for audio RTP timestamp: %"SCNu32"\n", (guint32)time_diff);
+				JANUS_LOG(LOG_HUGE, "XXX Computed offset for audio RTP timestamp: %"SCNu32"\n", (guint32)time_diff);
 			}
 		}
 		if(context->a_seq_reset) {
 			/* Audio sequence number was paused for a while */
-			JANUS_LOG(LOG_HUGE, "Audio RTP sequence number reset requested");
+			JANUS_LOG(LOG_HUGE, "XXX Audio RTP sequence number reset requested\n");
 			context->a_seq_reset = FALSE;
 			context->a_base_seq_prev = context->a_last_seq;
 			context->a_base_seq = seq;

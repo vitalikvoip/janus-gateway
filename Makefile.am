@@ -13,7 +13,7 @@ CLEANFILES = $(NULL)
 bin_PROGRAMS = janus
 
 headerdir = $(includedir)/janus
-header_HEADERS = apierror.h config.h log.h debug.h mutex.h record.h \
+header_HEADERS = apierror.h config.h log.h debug.h mutex.h record.h live.h \
 	rtcp.h rtp.h rtpsrtp.h sdp-utils.h ip-utils.h utils.h refcount.h text2pcap.h
 
 pluginsheaderdir = $(includedir)/janus/plugins
@@ -111,6 +111,8 @@ janus_SOURCES = \
 	mutex.h \
 	record.c \
 	record.h \
+	live.c \
+	live.h \
 	refcount.h \
 	rtcp.c \
 	rtcp.h \
@@ -152,6 +154,8 @@ janus_CFLAGS = \
 	-DLOGGERDIR=\"$(loggerdir)\" \
 	-DCONFDIR=\"$(confdir)\" \
 	$(BORINGSSL_CFLAGS) \
+	$(POST_PROCESSING_CFLAGS) \
+	$(OPUS_CFLAGS) \
 	$(NULL)
 
 janus_LDADD = \
@@ -160,6 +164,8 @@ janus_LDADD = \
 	$(JANUS_MANUAL_LIBS) \
 	$(LIBSRTP_LDFLAGS) $(LIBSRTP_LIBS) \
 	$(LIBCURL_LDFLAGS) $(LIBCURL_LIBS) \
+	$(POST_PROCESSING_LIBS) \
+	$(OPUS_LIBS) \
 	$(NULL)
 
 dist_man1_MANS = janus.1
