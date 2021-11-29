@@ -26,7 +26,7 @@ static janus_frame_packet *janus_packet_alloc(int data_len);
 static void janus_packet_free(janus_frame_packet *pkt);
 static void janus_live_pub_free(const janus_refcount *pub_ref);
 
-staticf int janus_live_rtp_header_extension_parse_audio_level(char *buf,int len, int id, int *level);
+static int janus_live_rtp_header_extension_parse_audio_level(char *buf,int len, int id, int *level);
 static int janus_live_rtp_header_extension_parse_video_orientation(char *buf, int len, int id, int *rotation);
 static void janus_live_h264_parse_sps(char *buffer, int *width, int *height);
 static void janus_live_rtp_unpack(janus_rtp_jb *jb, janus_frame_packet *packet, gboolean video);
