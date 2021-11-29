@@ -26,7 +26,7 @@ static janus_frame_packet *janus_packet_alloc(int data_len);
 static void janus_packet_free(janus_frame_packet *pkt);
 static void janus_live_pub_free(const janus_refcount *pub_ref);
 
-static int janus_live_rtp_header_extension_parse_audio_level(char *buf,int len, int id, int *level);
+staticf int janus_live_rtp_header_extension_parse_audio_level(char *buf,int len, int id, int *level);
 static int janus_live_rtp_header_extension_parse_video_orientation(char *buf, int len, int id, int *rotation);
 static void janus_live_h264_parse_sps(char *buffer, int *width, int *height);
 static void janus_live_rtp_unpack(janus_rtp_jb *jb, janus_frame_packet *packet, gboolean video);
@@ -91,7 +91,7 @@ janus_live_pub_create(const char *url, const char *acodec, const char *vcodec)
 
 		JANUS_LOG(LOG_INFO, "creating fdkaac encoder\n");
 
-		pub->audio_jb->aencoder = janus_live_fdkaac_encoder_create(48000, 2, 128);
+		pub->audio_jb->aencoder = janus_live_fdkaac_encoder_create(48000, 2, 256);
 		if (!pub->audio_jb->aencoder) {
 			JANUS_LOG(LOG_INFO, "creating fdkaac encoder failed\n");
 			goto error;
@@ -1017,8 +1017,8 @@ janus_live_ffmpeg_init(janus_live_pub *pub)
 
 	pub->aEncoder                     = avcodec_alloc_context3(acodec);
     pub->aEncoder->sample_rate        = 48000;
-    pub->aEncoder->bit_rate           = 128 * 1000;
-    pub->aEncoder->bit_rate_tolerance = 128 * 1000 * 3 / 2;
+    pub->aEncoder->bit_rate           = 256 * 1000;
+    pub->aEncoder->bit_rate_tolerance = 256 * 1000 * 3 / 2;
     pub->aEncoder->channels           = 2;
     pub->aEncoder->channel_layout     = AV_CH_LAYOUT_STEREO;
     pub->aEncoder->time_base          = (AVRational){ 1, pub->aEncoder->sample_rate };
