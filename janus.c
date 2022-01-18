@@ -4414,6 +4414,7 @@ gint main(int argc, char *argv[])
 	/* Handle SIGINT (CTRL-C), SIGTERM (from service managers) */
 	signal(SIGINT, janus_handle_signal);
 	signal(SIGTERM, janus_handle_signal);
+	signal(SIGPIPE, SIG_IGN);
 	atexit(janus_termination_handler);
 
 	/* Setup Glib */
