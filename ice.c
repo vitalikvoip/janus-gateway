@@ -1312,7 +1312,13 @@ gint janus_ice_handle_attach_plugin(void *core_session, janus_ice_handle *handle
 		g_free(session_handle);
 		return error;
 	}
+
+	JANUS_LOG(LOG_INFO, "ice_handle [%p] plugin_session [%p] plugin_handle [%p]\n", handle, session_handle, session_handle->plugin_handle);
+
 	janus_refcount_init(&session_handle->ref, janus_ice_plugin_session_free);
+
+	JANUS_LOG(LOG_INFO, "plugin_session [%p] ref [%p]\n", session_handle, &session_handle->ref);
+
 	/* Handle and plugin session reference each other */
 	janus_refcount_increase(&session_handle->ref);
 	janus_refcount_increase(&handle->ref);

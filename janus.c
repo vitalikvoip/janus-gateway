@@ -4107,6 +4107,110 @@ gboolean janus_plugin_auth_signature_contains(janus_plugin *plugin, const char *
 	return janus_auth_check_signature_contains(token, plugin->get_package(), descriptor);
 }
 
+#define SYMBOL_EXPORT __attribute__((visibility("default")))
+
+static int str_replace(const gchar *src, const gchar *pattern, const gchar* replacement, gchar *res, size_t res_size)
+{
+	int rc = -1;
+
+	do {
+		gchar   *needle  = NULL, *needle_end = NULL;
+		gchar   *ptr     = res;
+		size_t   copy_len = 0;
+
+
+		if (!src || !res || !pattern || !replacement)
+			break;
+
+		if (strlen(replacement) >= res_size)
+			break;
+
+		needle = strstr(src, pattern);
+		if (!needle) {
+			rc = 1;
+			break;
+		}
+
+		copy_len = needle - src;
+		if (copy_len >= res_size)
+			break;
+
+		strncpy(ptr, src, copy_len);
+		ptr += copy_len, res_size -= copy_len;
+
+		if (strlen(replacement) >= res_size)
+			break;
+
+		strncpy(ptr, replacement, strlen(replacement));
+		ptr += strlen(replacement), res_size -= strlen(replacement);
+
+		needle_end = needle + strlen(pattern);
+		copy_len = strlen(needle_end);
+
+		if (copy_len >= res_size)
+			break;
+
+		strncpy(ptr, needle_end, copy_len);
+
+		return 0;
+	} while(0);
+
+	return rc;
+}
+
+SYMBOL_EXPORT GThread * g_thread_try_new(const gchar *name, GThreadFunc func, gpointer data, GError **error)
+{
+	char buf[BUFSIZ] = {0};
+	char buf_tmp[BUFSIZ] = {0};
+	int err = 0;
+
+	struct rewrite {
+		const gchar *pattern;
+		const gchar *replacement;
+	};
+
+	struct rewrite rewrites[] = {
+		{.pattern = "videoroom",    .replacement = "vroom"}
+		,{.pattern = "videocall",   .replacement = "vcall"}
+		,{.pattern = "textroom",    .replacement = "troom"}
+		,{.pattern = "timeout",     .replacement = "tout"}
+		,{.pattern = "audiobridge", .replacement = "abridge"}
+		,{.pattern = "voicemail",   .replacement = "vmail"}
+		,{.pattern = "handler",     .replacement = "hndl"}
+		,{.pattern = "requests",    .replacement = "req"}
+		,{.pattern = NULL,          .replacement = NULL}
+	};
+
+	static GThread * (*real_g_thread_try_new)(const gchar *name, GThreadFunc func, gpointer data, GError **error);
+	if (!real_g_thread_try_new)
+		real_g_thread_try_new = dlsym(RTLD_NEXT, "g_thread_try_new");
+
+	strncpy(buf, name, sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+
+	int i = 0;
+	while (rewrites[i].pattern != NULL && rewrites[i].replacement != NULL) {
+		memset(buf_tmp,0,sizeof(buf_tmp));
+
+		int rc = str_replace(buf, rewrites[i].pattern, rewrites[i].replacement, buf_tmp, sizeof(buf_tmp));
+
+		if (rc < 0) {
+			err++;
+			break;
+		} else if (rc == 0) {
+			strcpy(buf, buf_tmp);
+		}
+
+		i++;
+	}
+
+	if (err) {
+		return real_g_thread_try_new(name, func, data, error);
+	} else {
+		buf[15] = '\0';
+		return real_g_thread_try_new(buf, func, data, error);
+	}
+}
 
 /* Main */
 gint main(int argc, char *argv[])
